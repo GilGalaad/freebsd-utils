@@ -155,7 +155,7 @@ def generate_duplicity_cmdline(task):
 
 def parse_args():
 	parser = argparse.ArgumentParser(description="Wrapper for Duplicity command line parameters", formatter_class=lambda prog: argparse.HelpFormatter(prog, width=150))
-	parser.add_argument("command", help="command to execute, may be on of the following: auto, inc, full, verify, status, remove, list, restore")
+	parser.add_argument("command", help="command to execute, must be one of the following: auto, inc, full, verify, status, remove, list, restore")
 	mode_group = parser.add_mutually_exclusive_group(required=False)
 	mode_group.add_argument("-n", "--dry-run", action="store_true", help="show the generated duplicity command line and exit, mutually exclusive with `--daemon` since no process is actually executed")
 	mode_group.add_argument("-d", "--daemon", action="store_true", help="redirect all output to file, and send by mail the outcome of the execution")
@@ -163,6 +163,8 @@ def parse_args():
 	dir_group.add_argument("-a", "--all", action="store_true", help="spawn a parallel duplicity process for each configured directory")
 	dir_group.add_argument("path", nargs="?", help="absolute path of the directory to work with, mutually exclusive with `--all` option")
 	args = parser.parse_args()
+	if args.command not in ["auto", "inc", "full", "verify", "status", "remove", "list", "restore"]:
+		parser.error("command must be one of the following: auto, inc, full, verify, status, remove, list, restore")
 	if args.path != None and not args.path.startswith("/"):
 		parser.error("path must be absolute")
 	if args.path != None:
