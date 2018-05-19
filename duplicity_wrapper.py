@@ -138,7 +138,7 @@ def generate_duplicity_cmdline(task):
 	elif task.args.command == "inc":
 		cmdline = "duplicity {co} {bo} --name {bn} {pa} {url}/{bn}".format(co=common_opts, bo=backup_opts, bn=get_backup_name(task.path), pa=task.path, url=remote_url)
 	elif task.args.command == "full":
-		cmdline = "duplicity full {co} {bo} --name {bn} {pa} {url}/{bn}".format(co=common_opts, bo=verify_opts, bn=get_backup_name(task.path), pa=task.path, url=remote_url)
+		cmdline = "duplicity full {co} {bo} --name {bn} {pa} {url}/{bn}".format(co=common_opts, bo=backup_opts, bn=get_backup_name(task.path), pa=task.path, url=remote_url)
 	elif task.args.command == "verify":
 		cmdline = "duplicity verify {co} {vo} --name {bn} {url}/{bn} {pa}".format(co=common_opts, vo=verify_opts, bn=get_backup_name(task.path), url=remote_url, pa=task.path)
 	elif task.args.command == "status":
