@@ -167,9 +167,9 @@ def parse_args():
 	args = parser.parse_args()
 	if args.command not in ["auto", "inc", "full", "verify", "status", "remove", "cleanup", "list", "restore"]:
 		parser.error("command must be one of the following: auto, inc, full, verify, status, remove, cleanup, list, restore")
-	if args.path != None and not args.path.startswith("/"):
+	if args.path is not None and not args.path.startswith("/"):
 		parser.error("path must be absolute")
-	if args.path != None:
+	if args.path is not None:
 		args.path = args.path.rstrip("/")
 	return args
 
