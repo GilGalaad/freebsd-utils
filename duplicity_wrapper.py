@@ -72,7 +72,7 @@ def main():
 
 	# process pool
 	pool = multiprocessing.dummy.Pool(processes=len(task_list))
-	res = pool.map(execute_task, task_list, 1)
+	res = pool.map_async(execute_task, task_list, 1)
 	pool.close()
 	pool.join()
 
@@ -83,7 +83,7 @@ def main():
 	# if interactive mode, write to stdout, else write to file and send mail
 	aggr_rc = 0
 	aggr_report = ""
-	for task_result in res:
+	for task_result in res.get():
 		aggr_rc += task_result.rc
 		aggr_report += task_result.out
 		if not args.dry_run:
