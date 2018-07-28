@@ -27,6 +27,8 @@ TaskResult = namedtuple("TaskResult", ["rc", "out"])
 """
 global variables, customize here
 """
+remote_name="remote_name"
+remote_url="rclone://" + remote_name + ":/backup"
 passphrase = "a_very_strong_password"
 work_dir = "/opt/duplicity_work_dir"
 temp_dir = work_dir + "/tempdir"
@@ -37,7 +39,6 @@ mail_to = "me@example.com"
 common_opts = "--archive-dir {} --tempdir {} --num-retries 10".format(work_dir, temp_dir)
 backup_opts = "--volsize 1000 --allow-source-mismatch --asynchronous-upload"
 verify_opts = "--compare-data"
-remote_url="duplicity://remote/url"
 default_path_list=[
 	"/store/documents",
 	"/store/pictures",
@@ -174,7 +175,7 @@ def parse_args():
 	return args
 
 def get_backup_name(path):
-	return path.strip("/").replace("/","_")
+	return path.strip("/").replace("/","_").replace(" ","_").lower()
 
 def check_lock(name):
 	path = "{}/{}.lock".format(temp_dir, name)
