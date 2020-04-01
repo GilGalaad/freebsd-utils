@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3.7
 
 """
 Wrapper for Duplicity command line parameters
@@ -8,7 +8,7 @@ Author: Francesco Magno
 Date created: 06/04/2018
 Licence: GPL-3.0
 Repository: https://github.com/GilGalaad/freebsd-utils
-Python Version: 2.7
+Python Version: 3.7
 """
 
 import os
@@ -126,7 +126,7 @@ def exec_duplicity(cmd_line):
 	try:
 		pass_env = os.environ.copy()
 		pass_env["PASSPHRASE"]=passphrase
-		p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=pass_env)
+		p = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=pass_env, text=True)
 		out, _ = p.communicate()
 		out = out.rstrip("\n") + "\n"
 		return p.returncode, out
