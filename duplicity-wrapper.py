@@ -26,7 +26,7 @@ global parameters, customize here
 """
 # remote repository
 remote_name = "gsuite:"
-remote_url = "rclonenew://" + remote_name + "/darksun_backup"
+remote_url = "rclonenew://" + remote_name + "/duplicity"
 passphrase = "my_strong_password"
 # paths
 work_dir = os.path.normpath("/store/maintenance/duplicity")
@@ -126,16 +126,17 @@ def extractDeltaEntries(out):
 def exec_subprocess(cmdline, env, daemon):
   cmd = shlex.split(cmdline)
   if daemon:
+    start_time = datetime.datetime.today()
+    p = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, text=True)
+    end_time = datetime.datetime.today()
+    rc = p.returncode
     with open(log_file, "w") as out:
-      start_time = datetime.datetime.today()
-      p = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=out, stderr=subprocess.STDOUT, env=env, text=True)
-      end_time = datetime.datetime.today()
-      rc = p.returncode
+      out.write(p.stdout.rstrip("\n"))
       report = ("\n" + "Process completed in {elapsed} seconds with exit code {rc}".format(elapsed=int((end_time - start_time).total_seconds()), rc=rc))
       out.write(report)
   else:
     start_time = datetime.datetime.today()
-    p = subprocess.run(cmd, stdin=None, stdout=None, stderr=None, env=env)
+    p = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=None, stderr=None, env=env)
     end_time = datetime.datetime.today()
     rc = p.returncode
     report = ("\n" + "Process completed in {elapsed} seconds with exit code {rc}".format(elapsed=int((end_time - start_time).total_seconds()), rc=rc))
