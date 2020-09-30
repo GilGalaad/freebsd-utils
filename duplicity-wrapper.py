@@ -26,7 +26,7 @@ global parameters, customize here
 """
 # remote repository
 remote_name = "gsuite:"
-remote_url = "rclonenew://" + remote_name + "/duplicity"
+remote_url = "rclone://" + remote_name + "/duplicity"
 passphrase = "my_strong_password"
 # paths
 work_dir = os.path.normpath("/store/maintenance/duplicity")
