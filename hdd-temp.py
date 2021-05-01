@@ -57,8 +57,6 @@ def read_temp_smartctl(dev):
   if rc == 1:
     sys.stderr.write("Error while calling `smartctl`: {}\n".format(out.split("\n")[3]))
     sys.exit(1)
-  if rc != 0:
-    sys.stderr.write("WARINING: Non zero return code for `smartctl`, there may be a failure in disk {}\n".format(dev))
   for line in out.split("\n"):
     if "Temperature_Celsius" in line:
       return line.split()[9] + " Celsius"
