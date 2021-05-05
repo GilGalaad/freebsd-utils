@@ -29,39 +29,36 @@ p = None
 
 
 def main():
-  cmd_args = sys.argv[1:]
-  rc = run_command(cmd_args)
-  exit(rc)
+    cmd_args = sys.argv[1:]
+    rc = run_command(cmd_args)
+    exit(rc)
 
 
 def run_command(cmd_args):
-  global p
-  proc_env = os.environ.copy()
-  proc_env["RESTIC_REPOSITORY"] = remote_url
-  proc_env["RESTIC_PASSWORD"] = passphrase
-  proc_env["RCLONE_DRIVE_USE_TRASH"] = "false"
-  proc_env["RCLONE_NO_TRAVERSE"] = "true"
-  proc_env["RCLONE_DRIVE_CHUNK_SIZE"] = "64M"
-  args = [restic_bin]
-  args.append("--cache-dir")
-  args.append(cache_dir)
-  args.append("--cleanup-cache")
-  args.extend(cmd_args)
-  try:
-    p = subprocess.Popen(args, env=proc_env)
-    p.wait()
-    return p.returncode
-  except OSError as ex:
-    print(ex.strerror)
-    return 1
+    global p
+    proc_env = os.environ.copy()
+    proc_env["RESTIC_REPOSITORY"] = remote_url
+    proc_env["RESTIC_PASSWORD"] = passphrase
+    proc_env["RCLONE_DRIVE_USE_TRASH"] = "false"
+    proc_env["RCLONE_NO_TRAVERSE"] = "true"
+    proc_env["RCLONE_DRIVE_CHUNK_SIZE"] = "64M"
+    args = [restic_bin, "--cache-dir", cache_dir, "--cleanup-cache"]
+    args.extend(cmd_args)
+    try:
+        p = subprocess.Popen(args, env=proc_env)
+        p.wait()
+        return p.returncode
+    except OSError as ex:
+        print(ex.strerror)
+        return 1
 
 
 def signal_handler(sig, frame):
-  global p
-  if p is not None and p.poll() is None:
-    p.send_signal(sig)
+    global p
+    if p is not None and p.poll() is None:
+        p.send_signal(sig)
 
 
 if __name__ == "__main__":
-  signal.signal(signal.SIGINT, signal_handler)
-  main()
+    signal.signal(signal.SIGINT, signal_handler)
+    main()
