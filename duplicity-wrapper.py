@@ -8,7 +8,7 @@ Author: Francesco Magno
 Date created: 21/04/2020
 Licence: GPL-3.0
 Repository: https://github.com/GilGalaad/freebsd-utils
-Python Version: 3.7
+Python Version: 3.8
 """
 
 import argparse
@@ -19,14 +19,16 @@ import shlex
 import smtplib
 import subprocess
 import sys
+from argparse import Namespace
 from email.mime.text import MIMEText
+from typing import Optional
 
 """
 global parameters, customize here
 """
 # remote repository
 remote_name = "gsuite:"
-remote_url = "rclone://" + remote_name + "/duplicity"
+remote_url = f"rclone://{remote_name}/duplicity"
 passphrase = "my_strong_password"
 # paths
 work_dir = os.path.normpath("/store/maintenance/duplicity")
@@ -43,12 +45,10 @@ mail_to = "root"
 # duplicity params
 backup_path = "/store"
 backup_name = "store"
-common_opts = "--name {bn} --archive-dir {ad} --tempdir {td} --num-retries 10".format(bn=backup_name, ad=archive_dir, td=tmp_dir)
+common_opts = f"--name {backup_name} --archive-dir {archive_dir} --tempdir {tmp_dir} --num-retries 10"
 backup_opts = "--volsize 1000 --allow-source-mismatch --asynchronous-upload"
-filelist_opts = "--exclude-device-files --include-filelist {fl} --exclude '**'".format(fl=filelist_file)
+filelist_opts = f"--exclude-device-files --include-filelist {filelist_file} --exclude '**'"
 verify_opts = "--compare-data"
-# misc
-tms_format = "%d/%m/%Y %H:%M:%S"
 """
 end of global parameters
 """
@@ -66,7 +66,7 @@ def main():
     if check_lock():
         cmd = sys.argv[0]
         cmd = os.path.basename(cmd).rstrip(".py")
-        print("{tms} - Another {cmd} instance is running, aborting execution...".format(tms=datetime.datetime.today().strftime(tms_format), cmd=cmd))
+        print(f"Another {cmd} instance is running, aborting execution...")
         exit(1)
 
     # acquire lock
@@ -74,47 +74,46 @@ def main():
         acquire_lock()
         try:
             rc = run_duplicity(args)
+            if args.daemon:
+                send_mail(rc, read_file(log_file))
         except OSError as ex:
-            print("Error while launching duplicity: {err}".format(err=ex.strerror))
+            print(f"Error while launching duplicity: {ex.strerror}")
             exit(1)
-
-        if args.daemon:
-            send_mail(rc, read_file(log_file))
     finally:
         release_lock()
 
 
-def print_cmdline(args):
+def print_cmdline(args: Namespace) -> None:
     env = generate_command_env(args)
     envline = " ".join("=".join(_) for _ in env.items())
     cmdline = generate_duplicity_cmdline(args.command, dry_run=True, file_to_restore=args.file_to_restore)
-    print(envline + " " + cmdline)
+    print(f"{envline} {cmdline}")
 
 
-def run_duplicity(args):
+def run_duplicity(args: Namespace) -> int:
     env = os.environ.copy()
     env.update(generate_command_env(args))
-    # if backing up, dry run first
+    # if incremental backup, dry run first
     if args.command == "inc":
         cmdline = generate_duplicity_cmdline(args.command, dry_run=True)
-        rc = exec_subprocess(cmdline, env, True)
+        rc = run_subprocess(cmdline, env, True)
         out = read_file(log_file)
-        delta = extractDeltaEntries(out)
+        delta = extract_delta_entries(out)
         if delta == 0:
-            message = "\n" + "No changes detected in dataset, skipping backup"
+            footer = "\n" + "No changes detected in dataset, skipping backup"
             if args.daemon:
-                write_file(log_file, out + message)
+                write_file(log_file, out + footer)
                 return rc
             else:
-                print(out + message)
+                print(out + footer)
                 return rc
     # continue normally
     cmdline = generate_duplicity_cmdline(args.command, dry_run=False, file_to_restore=args.file_to_restore)
-    rc = exec_subprocess(cmdline, env, args.daemon)
+    rc = run_subprocess(cmdline, env, args.daemon)
     return rc
 
 
-def extractDeltaEntries(out):
+def extract_delta_entries(out: str) -> int:
     match = re.search("DeltaEntries (\\d+)", out)
     if match:
         delta = int(match.group(1))
@@ -123,33 +122,30 @@ def extractDeltaEntries(out):
     return delta
 
 
-def exec_subprocess(cmdline, env, daemon):
+def run_subprocess(cmdline: str, env: dict, daemon: bool) -> int:
     cmd = shlex.split(cmdline)
+    start_time = datetime.datetime.now()
     if daemon:
-        start_time = datetime.datetime.today()
         p = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, text=True)
-        end_time = datetime.datetime.today()
-        rc = p.returncode
+    else:
+        p = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=None, stderr=None, env=env, text=True)
+    end_time = datetime.datetime.now()
+    footer = f"\nProcess completed in {int((end_time - start_time).total_seconds())} seconds with exit code {p.returncode}"
+    if daemon:
         with open(log_file, "w") as out:
             out.write(p.stdout.rstrip("\n"))
-            report = ("\n" + "Process completed in {elapsed} seconds with exit code {rc}".format(elapsed=int((end_time - start_time).total_seconds()), rc=rc))
-            out.write(report)
+            out.write(footer)
     else:
-        start_time = datetime.datetime.today()
-        p = subprocess.run(cmd, stdin=subprocess.DEVNULL, stdout=None, stderr=None, env=env)
-        end_time = datetime.datetime.today()
-        rc = p.returncode
-        report = ("\n" + "Process completed in {elapsed} seconds with exit code {rc}".format(elapsed=int((end_time - start_time).total_seconds()), rc=rc))
-        print(report)
-    return rc
+        print(footer)
+    return p.returncode
 
 
-def generate_command_env(args):
+def generate_command_env(args: Namespace) -> dict:
     env = {}
     env["PASSPHRASE"] = passphrase
     env["RCLONE_DRIVE_USE_TRASH"] = "false"
     env["RCLONE_NO_TRAVERSE"] = "true"
-    env["RCLONE_DRIVE_CHUNK_SIZE"] = "64M"
+    env["RCLONE_DRIVE_CHUNK_SIZE"] = "128M"
     if args.rclone_verbose:
         env["RCLONE_LOG_FILE"] = rclone_log_file
         env["RCLONE_LOG_LEVEL"] = "DEBUG"
@@ -160,31 +156,31 @@ def generate_command_env(args):
     return env
 
 
-def generate_duplicity_cmdline(command, dry_run=False, file_to_restore=None):
+def generate_duplicity_cmdline(command: str, dry_run: bool = False, file_to_restore: Optional[str] = None) -> str:
     if command == "inc":
-        cmdline = "duplicity {co} {bo} {fl} {pa} {url}".format(co=common_opts, bo=backup_opts, fl=filelist_opts, pa=backup_path, url=remote_url)
+        cmdline = f"duplicity {common_opts} {backup_opts} {filelist_opts} {backup_path} {remote_url}"
     elif command == "full":
-        cmdline = "duplicity full {co} {bo} {fl} {pa} {url}".format(co=common_opts, bo=backup_opts, fl=filelist_opts, pa=backup_path, url=remote_url)
+        cmdline = f"duplicity full {common_opts} {backup_opts} {filelist_opts} {backup_path} {remote_url}"
     elif command == "verify":
         if not file_to_restore:
-            cmdline = "duplicity verify {co} {vo} {fl} {url} {pa}".format(co=common_opts, vo=verify_opts, fl=filelist_opts, url=remote_url, pa=backup_path)
+            cmdline = f"duplicity verify {common_opts} {verify_opts} {filelist_opts} {remote_url} {backup_path}"
         else:
             ftr = file_to_restore.rstrip("/")
-            cmdline = "duplicity verify {co} {vo} {url} {pa}/{ftr} --file-to-restore {ftr}".format(co=common_opts, vo=verify_opts, fl=filelist_opts, url=remote_url, pa=backup_path, ftr=ftr)
+            cmdline = f"duplicity verify {common_opts} {verify_opts} {remote_url} {backup_path}/{ftr} --file-to-restore {ftr}"
     elif command == "status":
-        cmdline = "duplicity collection-status {co} {url}".format(co=common_opts, url=remote_url)
+        cmdline = f"duplicity collection-status {common_opts} {remote_url}"
     elif command == "remove":
-        cmdline = "duplicity remove-all-but-n-full 1 {co} --force {url}".format(co=common_opts, url=remote_url)
+        cmdline = f"duplicity remove-all-but-n-full 1 {common_opts} --force {remote_url}"
     elif command == "cleanup":
-        cmdline = "duplicity cleanup {co} --force {url}".format(co=common_opts, url=remote_url)
+        cmdline = f"duplicity cleanup {common_opts} --force {remote_url}"
     elif command == "list":
-        cmdline = "duplicity list-current-files {co} {url}".format(co=common_opts, url=remote_url)
+        cmdline = f"duplicity list-current-files {common_opts} {remote_url}"
     elif command == "restore":
         ftr = file_to_restore.rstrip("/")
-        cmdline = "duplicity restore {co} {url} {res}/{dest} --file-to-restore {ftr}".format(co=common_opts, url=remote_url, res=restore_dir, dest=os.path.basename(ftr), ftr=ftr)
+        cmdline = f"duplicity restore {common_opts} {remote_url} {restore_dir}/{os.path.basename(ftr)} --file-to-restore {ftr}"
     else:
-        raise NotImplementedError("Unexpected exception: comand {} not implemented".format(command))
-    if dry_run == True:
+        raise NotImplementedError(f"Unexpected exception: command {command} not implemented")
+    if dry_run:
         return cmdline + " --dry-run"
     return cmdline
 
@@ -212,7 +208,7 @@ def release_lock():
     os.remove(lock_file)
 
 
-def send_mail(rc, report):
+def send_mail(rc: int, report: str) -> None:
     msg = MIMEText(report)
     msg["Subject"] = "duplicity log: return code {rc}".format(rc=rc)
     msg["From"] = mail_from
@@ -222,7 +218,7 @@ def send_mail(rc, report):
     s.quit()
 
 
-def parse_args():
+def parse_args() -> Namespace:
     parser = argparse.ArgumentParser(description="Wrapper for Duplicity command line parameters", formatter_class=lambda prog: argparse.HelpFormatter(prog, width=150))
     parser.add_argument("command", help="command to execute, must be one of the following: inc, full, verify, status, remove, cleanup, list, restore")
     parser.add_argument("file_to_restore", action="store", nargs="?", help="relative path to be restored or verified")
